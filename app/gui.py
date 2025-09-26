@@ -4,16 +4,10 @@ import dearpygui.dearpygui as dpg
 import threading
 import time
 import numpy as np
-
-import app_state
-from serial_handler import (find_serial_ports, connect_serial, disconnect_serial, send_command, wave_generator_thread)
-
-# <<< REMOVED IMPORTS RELATED TO THE DELETED SISMOS LOCALES TAB >>>
-# from seismic_handler import ( play_local_sismo_thread, create_waveform_image)
-
-# <<< NEW: Import the viewer handler >>>
 import seismic_viewer_handler as svh
+import app_state
 
+from serial_handler import (find_serial_ports, connect_serial, disconnect_serial, send_command, wave_generator_thread)
 
 RECORDS_FOLDER_NAME = "sismic_records"
 
