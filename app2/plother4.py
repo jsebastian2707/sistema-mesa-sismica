@@ -6,9 +6,7 @@ import dearpygui.dearpygui as dpg
 from collections import deque
 import math
 import requests
-import numpy as np # <<< NUEVA DEPENDENCIA
-
-# <<< NUEVO: Dependencias de ObsPy >>>
+import numpy as np
 from obspy.clients.fdsn import Client
 from obspy import UTCDateTime
 
@@ -100,36 +98,7 @@ def wave_generator_thread():
         send_command(f"m{int(target_pos)}")
         time.sleep(0.02) # ~50 Hz update rate
     send_command("m0")
-
-def search_sismos_thread():
-    global sismos_data
-    dpg.set_value("sismo_status", "Buscando sismos...")
-    dpg.configure_item("sismo_list", items=[])
-    dpg.set_value("sismo_details", "")
-    dpg.disable_item("play_sismo_button")
-
-    min_mag = dpg.get_value("min_mag_input")
-    max_mag = dpg.get_value("max_mag_input")
-    url = f"https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude={min_mag}&maxmagnitude={max_mag}"
-    
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        with api_lock:
-            sismos_data = data.get("features", [])
-        if not sismos_data:
-            dpg.set_value("sismo_status", "No se encontraron sismos con esos criterios.")
-            return
-        sismo_titles = [f"{s['properties']['mag']:.1f} mag - {s['properties']['place']}" for s in sismos_data]
-        dpg.configure_item("sismo_list", items=sismo_titles)
-        dpg.set_value("sismo_status", f"Se encontraron {len(sismos_data)} eventos.")
-    except requests.exceptions.RequestException as e:
-        dpg.set_value("sismo_status", f"Error de red: {e}")
-    finally:
-        dpg.enable_item("search_sismos_button")
         
-
 def play_sismo_thread():
     global sismo_running, plot_start_time, expected_wave_data
     
@@ -276,10 +245,6 @@ def stop_wave_callback():
     wave_running = False
     dpg.enable_item("start_wave_button"); dpg.disable_item("stop_wave_button")
 
-def search_sismos_callback():
-    dpg.disable_item("search_sismos_button")
-    threading.Thread(target=search_sismos_thread, daemon=True).start()
-
 def sismo_selected_callback(sender, app_data):
     selected_title = app_data
     with api_lock:
@@ -338,9 +303,19 @@ def update_gui_callbacks():
             dpg.set_y_scroll("console_send_container", -1.0)
             log_dirty = False
 
+def update_plot_sizes():
+    if dpg.does_item_exist("main_window"):
+        window_width = dpg.get_item_width("main_window")
+        window_height = dpg.get_item_height("main_window")
+        plot_width = (window_width - 40) // 2
+        plot_height = window_height - 400
+        if dpg.does_item_exist("time_plot"):
+            dpg.configure_item("time_plot", width=plot_width, height=plot_height)
+        if dpg.does_item_exist("compare_plot"):
+            dpg.configure_item("compare_plot", width=plot_width, height=plot_height)
+
 def cleanup():
     global app_running, wave_running, sismo_running
-    print("Cerrando aplicación...")
     wave_running = False; app_running = False; sismo_running = False
     time.sleep(0.1)
     if ser and ser.is_open: ser.close()
@@ -348,13 +323,19 @@ def cleanup():
 
 dpg.create_context()
     
-
 with dpg.window(label="Panel de Control", tag="main_window", width=1200, height=700):
-    with dpg.plot(label="Feedback de Posicion", height=400, width=-1):
-        dpg.add_plot_legend()
-        dpg.add_plot_axis(dpg.mvXAxis, label="Tiempo (s)", tag="x_axis_main")
-        with dpg.plot_axis(dpg.mvYAxis, label="Posicion (pasos)", tag="y_axis_main"):
-            dpg.add_line_series([], [], label="Posicion Real", tag="series_real_main")
+    with dpg.group(horizontal=True):
+        with dpg.plot(label="Feedback de Posicion",tag="time_plot", height=400, width=400):
+            dpg.add_plot_legend()
+            dpg.add_plot_axis(dpg.mvXAxis, label="Tiempo (s)", tag="x_axis_main")
+            with dpg.plot_axis(dpg.mvYAxis, label="Posicion (pasos)", tag="y_axis_main"):
+                dpg.add_line_series([], [], label="Posicion Real", tag="series_real_main")
+        with dpg.plot(label="Comparación de Movimiento", tag="compare_plot", height=400, width=400):
+                    dpg.add_plot_legend()
+                    dpg.add_plot_axis(dpg.mvXAxis, label="Tiempo (s)", tag="x_axis_comp")
+                    with dpg.plot_axis(dpg.mvYAxis, label="Posicion (pasos)", tag="y_axis_comp"):
+                        dpg.add_line_series([], [], label="Movimiento Esperado (Sismo)", tag="series_expected_comp")
+                        dpg.add_line_series([], [], label="Movimiento Real (Encoder)", tag="series_real_comp")
     with dpg.tab_bar():
         with dpg.tab(label="conexion"):
             with dpg.group(horizontal=True):
@@ -367,67 +348,59 @@ with dpg.window(label="Panel de Control", tag="main_window", width=1200, height=
             dpg.add_text("", tag="connection_status", color=(255, 0, 0))
         # --- PESTAÑA 1: GENERADOR DE ONDAS ---
         with dpg.tab(label="Generador de Ondas"):
-            with dpg.group(horizontal=True):
-                with dpg.group(width=300):
-                    # ... (Controles sin cambios) ...
-                    dpg.add_text("Generador de Onda Senoidal")
-                    dpg.add_slider_int(label="Amplitud", tag="amplitude_slider", default_value=1600, min_value=100, max_value=10000)
-                    dpg.add_slider_float(label="Frecuencia", tag="frequency_slider", default_value=0.5, min_value=0.1, max_value=5.0, format="%.2f Hz")
-                    dpg.add_separator()
-                    dpg.add_text("Ajustes del Motor")
-                    dpg.add_input_int(label="Velocidad (s)", tag="speed_input", default_value=50000)
-                    dpg.add_input_int(label="Aceleracion (a)", tag="accel_input", default_value=20000)
-                    dpg.add_separator()
-                    with dpg.group(horizontal=True):
-                        dpg.add_button(label="Iniciar Onda", tag="start_wave_button", callback=start_wave_callback, width=-1)
-                        dpg.add_button(label="Detener Onda", tag="stop_wave_button", callback=stop_wave_callback, width=-1); dpg.disable_item("stop_wave_button")
-                    dpg.add_separator()
-                    dpg.add_text("Control Manual y Log")
-                    dpg.add_input_text(tag="command_input", hint="Comando (ej. m0)", on_enter=True, callback=send_manual_command_callback)
-                    dpg.add_button(label="Enviar Comando", callback=send_manual_command_callback, width=-1)
-                    with dpg.child_window(tag="console_send_container", height=150, border=True):
-                        dpg.add_input_text(tag="console_send_output", multiline=True, readonly=True, width=-1, height=-1)
-                
-                with dpg.group():
+            with dpg.collapsing_header(label="generar onda", tag="generator_header", show=True):
+                with dpg.group(horizontal=True):
+                    with dpg.group(width=300):
+                        # ... (Controles sin cambios) ...
+                        dpg.add_text("Generador de Onda Senoidal")
+                        dpg.add_slider_int(label="Amplitud", tag="amplitude_slider", default_value=1600, min_value=100, max_value=10000)
+                        dpg.add_slider_float(label="Frecuencia", tag="frequency_slider", default_value=0.5, min_value=0.1, max_value=5.0, format="%.2f Hz")
+                        dpg.add_separator()
+                        dpg.add_text("Ajustes del Motor")
+                        dpg.add_input_int(label="Velocidad (s)", tag="speed_input", default_value=50000)
+                        dpg.add_input_int(label="Aceleracion (a)", tag="accel_input", default_value=20000)
+                        dpg.add_separator()
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Iniciar Onda", tag="start_wave_button", callback=start_wave_callback, width=-1)
+                            dpg.add_button(label="Detener Onda", tag="stop_wave_button", callback=stop_wave_callback, width=-1); dpg.disable_item("stop_wave_button")
+                        dpg.add_separator()
+                        dpg.add_text("Control Manual y Log")
+                        dpg.add_input_text(tag="command_input", hint="Comando (ej. m0)", on_enter=True, callback=send_manual_command_callback)
+                        dpg.add_button(label="Enviar Comando", callback=send_manual_command_callback, width=-1)
+                        with dpg.child_window(tag="console_send_container", height=150, border=True):
+                            dpg.add_input_text(tag="console_send_output", multiline=True, readonly=True, width=-1, height=-1)
                     
-                    dpg.add_text("Recibido desde la Mesa")
-                    with dpg.child_window(tag="console_recv_container", border=True):
-                        dpg.add_input_text(tag="console_recv_output", multiline=True, readonly=True, width=-1, height=-1)
+                    with dpg.group():
+                        
+                        dpg.add_text("Recibido desde la Mesa")
+                        with dpg.child_window(tag="console_recv_container", border=True):
+                            dpg.add_input_text(tag="console_recv_output", multiline=True, readonly=True, width=-1, height=-1)
+            with dpg.collapsing_header(label="generar onda", tag="file_picker_header", show=True):
+                with dpg.group(horizontal=True):
+                    with dpg.group(width=450):
+                        dpg.add_text("Buscar Sismos (USGS - Ultimo Mes)")
+                        dpg.add_input_float(label="Magnitud Mínima", tag="min_mag_input", default_value=5.0, step=0.1, format="%.1f")
+                        dpg.add_input_float(label="Magnitud Máxima", tag="max_mag_input", default_value=8.0, step=0.1, format="%.1f")
+                        ##dpg.add_button(label="Buscar Sismos", tag="search_sismos_button", callback=search_sismos_callback, width=-1)
+                        dpg.add_text("Buscando...", tag="sismo_status")
+                        dpg.add_listbox(tag="sismo_list", callback=sismo_selected_callback, width=-1, num_items=18)
 
-        # --- PESTAÑA 2: BÚSQUEDA DE SISMOS ---
-        with dpg.tab(label="Búsqueda de Sismos (USGS)"):
-            with dpg.group(horizontal=True):
-                with dpg.group(width=450):
-                    dpg.add_text("Buscar Sismos (USGS - Ultimo Mes)")
-                    dpg.add_input_float(label="Magnitud Mínima", tag="min_mag_input", default_value=5.0, step=0.1, format="%.1f")
-                    dpg.add_input_float(label="Magnitud Máxima", tag="max_mag_input", default_value=8.0, step=0.1, format="%.1f")
-                    dpg.add_button(label="Buscar Sismos", tag="search_sismos_button", callback=search_sismos_callback, width=-1)
-                    dpg.add_text("Buscando...", tag="sismo_status")
-                    dpg.add_listbox(tag="sismo_list", callback=sismo_selected_callback, width=-1, num_items=18)
+                    with dpg.group():
+                        dpg.add_text("Detalles del Sismo Seleccionado")
+                        dpg.add_input_text(tag="sismo_details", multiline=True, readonly=True, width=-1, height=200)
+                        dpg.add_separator()
+                        dpg.add_text("Controles de Reproducción")
+                        dpg.add_slider_int(label="Amplitud de Reproducción", tag="sismo_amplitude_slider", min_value=100, max_value=20000, default_value=5000)
+                        with dpg.group(horizontal=True):
+                            dpg.add_button(label="Reproducir Sismo", tag="play_sismo_button", callback=play_sismo_callback, width=200)
+                            dpg.add_button(label="Detener Reproducción", tag="stop_sismo_button", callback=stop_sismo_callback, width=200)
+                        dpg.disable_item("play_sismo_button"); dpg.disable_item("stop_sismo_button")
+                        dpg.add_text("Estado: Listo", tag="sismo_playback_status")
 
-                with dpg.group():
-                    dpg.add_text("Detalles del Sismo Seleccionado")
-                    dpg.add_input_text(tag="sismo_details", multiline=True, readonly=True, width=-1, height=200)
-                    dpg.add_separator()
-                    dpg.add_text("Controles de Reproducción")
-                    dpg.add_slider_int(label="Amplitud de Reproducción", tag="sismo_amplitude_slider", min_value=100, max_value=20000, default_value=5000)
-                    with dpg.group(horizontal=True):
-                        dpg.add_button(label="Reproducir Sismo", tag="play_sismo_button", callback=play_sismo_callback, width=200)
-                        dpg.add_button(label="Detener Reproducción", tag="stop_sismo_button", callback=stop_sismo_callback, width=200)
-                    dpg.disable_item("play_sismo_button"); dpg.disable_item("stop_sismo_button")
-                    dpg.add_text("Estado: Listo", tag="sismo_playback_status")
+        
 
-        # <<< NUEVO: PESTAÑA 3: COMPARACIÓN DE MOVIMIENTO >>>
-        with dpg.tab(label="Playback & Comparison"):
-            dpg.add_text("Comparación de Movimiento Esperado vs. Real")
-            dpg.add_separator()
-            with dpg.plot(label="Comparación de Movimiento", tag="comparison_plot", height=-1, width=-1):
-                dpg.add_plot_legend()
-                dpg.add_plot_axis(dpg.mvXAxis, label="Tiempo (s)", tag="x_axis_comp")
-                with dpg.plot_axis(dpg.mvYAxis, label="Posicion (pasos)", tag="y_axis_comp"):
-                    dpg.add_line_series([], [], label="Movimiento Esperado (Sismo)", tag="series_expected_comp")
-                    dpg.add_line_series([], [], label="Movimiento Real (Encoder)", tag="series_real_comp")
-
+with dpg.item_handler_registry(tag="window_resize_handler"):
+    dpg.add_item_resize_handler(callback=update_plot_sizes)
 
 # --- Configuración del Viewport y Bucle Principal ---
 dpg.create_viewport(title='Controlador Mesa Sísmica Avanzado', width=1200, height=700)
@@ -435,7 +408,10 @@ dpg.setup_dearpygui()
 dpg.set_primary_window("main_window", True)
 threading.Thread(target=read_serial_thread, daemon=True).start()
 dpg.show_viewport()
-
+dpg.maximize_viewport()
+# Bind resize handler to the window
+dpg.bind_item_handler_registry("main_window", "window_resize_handler")
+update_plot_sizes()
 while dpg.is_dearpygui_running():
     update_gui_callbacks()
     dpg.render_dearpygui_frame()
