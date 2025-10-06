@@ -15,7 +15,7 @@ expected_wave_data = deque(maxlen=500); plot_start_time = 0; max_points = 500
 
 log_recv = deque(maxlen=100); log_sent = deque(maxlen=100); log_dirty = False
 
-viewer_seismic_files = {}           # Files and their traces for the viewer
-viewer_all_traces = []              # Flat list of all traces
-viewer_selected_trace_index = None  # Index of the selected trace
+viewer_seismic_files = {}
+viewer_all_traces = []              
+viewer_selected_trace_index = None
 viewer_data_dirty = threading.Event() # Event to notify GUI to update viewer
