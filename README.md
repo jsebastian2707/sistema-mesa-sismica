@@ -53,7 +53,72 @@ graph TD
         G -->|Feedback Serial| POS
     end
 ```
+## 🧱 Diagrama de Clases 
+```mermaid
+classDiagram
+    class app_state {
+        <<module>>
+        +data_lock threading.Lock
+        +list x_data
+        +list y_data
+        +list expected_wave_data
+        +list log_recv
+        +list log_sent
+        +bool log_dirty
+        +bool wave_running
+        +bool app_running
+        +float plot_start_time
+        +int max_points
+        +dict viewer_seismic_files
+        +list viewer_all_traces
+        +int viewer_selected_trace_index
+        +threading.Event viewer_data_dirty
+    }
 
+    class main {
+        <<module>>
+        +create_gui()
+        +update_gui_callbacks()
+        +cleanup()
+        +main()
+        -update_ui_for_connection_state(bool)
+        -checkbox_callback()
+        -connect_callback()
+        -disconnect_callback()
+        -refresh_ports_callback()
+        -send_manual_command_callback()
+        -start_wave_callback()
+        -stop_wave_callback()
+        -_viewer_on_trace_select()
+        -_update_viewer_file_tree()
+        -_update_viewer_detailed_plot()
+    }
+
+    class serial_handler {
+        <<module>>
+        +find_serial_ports() list
+        +connect_serial(port, baud) tuple
+        +disconnect_serial()
+        +send_command(command)
+        +read_serial_thread()
+        +wave_generator_thread()
+    }
+
+    class seismic_handler {
+        <<module>>
+        +RECORDS_FOLDER_NAME str
+        +get_records_folder_path() str
+        +load_data_for_viewer_thread()
+        +process_selected_trace()
+    }
+    
+    main ..> app_state : reads/writes
+    main ..> serial_handler : calls
+    main ..> seismic_handler : calls
+
+    serial_handler ..> app_state : reads/writes
+    seismic_handler ..> app_state : reads/writes
+```
 ## 🛒 Bill of Materials (BoM)
 
 * Control: **ESP32** DevKit (WROOM o S3).
