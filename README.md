@@ -119,6 +119,57 @@ classDiagram
     serial_handler ..> app_state : reads/writes
     seismic_handler ..> app_state : reads/writes
 ```
+## 🧱 Diagrama de casos de uso 
+```mermaid
+graph LR
+    User([👤 Usuario/Operador])
+    ESP32([🔌 ESP32 Hardware])
+    Encoder([📐 Encoder AS5600])
+    
+    subgraph System["Sistema Mesa Sísmica"]
+        UC1((Conectar<br/>a ESP32))
+        UC2((Desconectar<br/>ESP32))
+        UC3((Enviar<br/>Comando Manual))
+        UC4((Configurar<br/>Parámetros Motor))
+        UC5((Generar<br/>Onda Sinusoidal))
+        UC6((Detener<br/>Generación))
+        UC7((Cargar<br/>Registros Sísmicos))
+        UC8((Seleccionar<br/>Traza Sísmica))
+        UC9((Visualizar<br/>Traza Detallada))
+        UC10((Procesar<br/>Traza para Mesa))
+        UC11((Monitorear<br/>Posición Real))
+        UC12((Comparar<br/>Expected vs Real))
+    end
+    
+    User --- UC1
+    User --- UC2
+    User --- UC3
+    User --- UC4
+    User --- UC5
+    User --- UC6
+    User --- UC7
+    User --- UC8
+    User --- UC9
+    User --- UC10
+    User --- UC11
+    User --- UC12
+    
+    UC1 -.- ESP32
+    UC2 -.- ESP32
+    UC3 -.- ESP32
+    UC5 -.- ESP32
+    UC6 -.- ESP32
+    
+    UC11 -.- Encoder
+    UC12 -.- Encoder
+    
+    UC5 -.->|include| UC4
+    UC10 -.->|include| UC8
+    UC9 -.->|include| UC8
+    UC11 -.->|require| UC1
+    UC3 -.->|require| UC1
+    UC5 -.->|require| UC1
+```
 ## 🛒 Bill of Materials (BoM)
 
 * Control: **ESP32** DevKit (WROOM o S3).
