@@ -24,7 +24,7 @@ Sistema de **reproducción de acelerogramas reales** en una mesa sísmica de lab
 
 ```mermaid
 graph TD
-    subgraph PC["PC - Procesamiento y Control"]
+    subgraph PC["App"]
         A[Acelerograma a-t] --> B[Filtro/Normalización]
         B --> C[Integración Doble ∫∫]
         C --> D[Desplazamiento Deseado x_ref]
@@ -36,7 +36,7 @@ graph TD
     
     CMD -->|Serial/USB| G
     
-    subgraph Mesa["Mesa Sísmica - Hardware"]
+    subgraph Mesa["Mesa Sísmica"]
         G[ESP32 Controlador]
         K[Encoder AS5600]
         GEN[Generador Pulsos STEP/DIR]
@@ -123,8 +123,7 @@ classDiagram
 ```mermaid
 graph LR
     User([👤 Usuario/Operador])
-    ESP32([🔌 ESP32 Hardware])
-    Encoder([📐 Encoder AS5600])
+    ESP32([🔌 ESP32 + Encoder AS5600])
     
     subgraph System["Sistema Mesa Sísmica"]
         UC1((Conectar<br/>a ESP32))
@@ -159,9 +158,8 @@ graph LR
     UC3 -.- ESP32
     UC5 -.- ESP32
     UC6 -.- ESP32
-    
-    UC11 -.- Encoder
-    UC12 -.- Encoder
+    UC11 -.- ESP32
+    UC12 -.- ESP32
     
     UC5 -.->|include| UC4
     UC10 -.->|include| UC8
@@ -169,6 +167,7 @@ graph LR
     UC11 -.->|require| UC1
     UC3 -.->|require| UC1
     UC5 -.->|require| UC1
+    
 ```
 ## 🛒 Bill of Materials (BoM)
 
