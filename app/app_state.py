@@ -11,9 +11,13 @@ wave_running = False
 sismo_running = False
 
 x_data = deque(maxlen=500); y_data = deque(maxlen=500)
-expected_wave_data = deque(maxlen=500); plot_start_time = 0; max_points = 500
+expected_wave_data = deque(maxlen=500); 
+plot_start_time = 0; 
+max_points = 500
 
-log_recv = deque(maxlen=100); log_sent = deque(maxlen=100); log_dirty = False
+log_recv = deque(maxlen=100)
+log_sent = deque(maxlen=100)
+log_dirty = False
 
 viewer_seismic_files = {}
 viewer_all_traces = []              

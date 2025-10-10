@@ -150,16 +150,33 @@ def update_gui_callbacks():
             if dpg.does_item_exist("console_send_container"): dpg.set_y_scroll("console_send_container", -1.0)
             app_state.log_dirty = False
 
-
+def update_plot_sizes():
+    if dpg.does_item_exist("main_window"):
+        window_width = dpg.get_item_width("main_window")
+        window_height = dpg.get_item_height("main_window")
+        plot_width = (window_width - 20) // 2.5
+        plot_width2 = (window_width - 20) // 1.6666
+        plot_height = window_height - 400
+        if dpg.does_item_exist("monitor"):
+            dpg.configure_item("monitor", width=plot_width, height=plot_height)
+        if dpg.does_item_exist("validation"):
+            dpg.configure_item("validation", width=plot_width2, height=plot_height)
+            
 def create_gui():
     dpg.create_context()
     with dpg.window(label="Panel de Control", tag="main_window"):
-        with dpg.plot(label="comparicion", height=250, width=-1):
-            dpg.add_plot_legend()
-            dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="x_axis_comp")
-            with dpg.plot_axis(dpg.mvYAxis, label="Position (steps)", tag="y_axis_comp"):
-                dpg.add_line_series([], [], label="Expected", tag="series_expected_comp")
-                dpg.add_line_series([], [], label="Real", tag="series_real_comp")
+        with dpg.group(horizontal=True):
+            with dpg.plot(label="monitor", tag="monitor"):
+                dpg.add_plot_legend()
+                dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="x_axis_comp")
+                with dpg.plot_axis(dpg.mvYAxis, label="Position (steps)", tag="y_axis_comp"):
+                    dpg.add_line_series([], [], label="Real", tag="series_real_comp")
+            with dpg.plot(label="validation" , tag="validation"):
+                dpg.add_plot_legend()
+                dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="x_axis_comp2")
+                with dpg.plot_axis(dpg.mvYAxis, label="Position (steps)", tag="y_axis_comp2"):
+                    dpg.add_line_series([], [], label="Expected", tag="series_expected_comp2")
+                    dpg.add_line_series([], [], label="Real", tag="series_real_comp2")
         with dpg.group(horizontal=True):
             dpg.add_text("Serial Port")
             dpg.add_combo(items=[], tag="ports_combo", width=150)
@@ -218,10 +235,14 @@ def create_gui():
                 dpg.add_input_int(label="Speed (s)", tag="speed_input", default_value=50000)
                 dpg.add_input_int(label="Acceleration (a)", tag="accel_input", default_value=20000)
 
+    with dpg.item_handler_registry(tag="window_resize_handler"):
+        dpg.add_item_resize_handler(callback=update_plot_sizes)
+    dpg.bind_item_handler_registry("main_window", "window_resize_handler")
     dpg.create_viewport(title='Modular Seismic Table Controller', width=1200, height=700,x_pos=0, y_pos=0)
     dpg.set_primary_window("main_window", True)
     dpg.setup_dearpygui()
     update_ui_for_connection_state(False)
+    
     
 def cleanup():
     disconnect_serial()
