@@ -6,7 +6,7 @@ import time
 import app_state
 from serial_handler import (find_serial_ports, connect_serial, disconnect_serial, 
                             send_command, wave_generator_thread, read_serial_thread)
-import seismic_handler as svh
+import seismic_handler as sh
 
 prefab = True
 
@@ -124,7 +124,7 @@ def _update_viewer_detailed_plot():
         dpg.fit_axis_data(x_axis)
         dpg.fit_axis_data(y_axis)
     with dpg.group(horizontal=True, parent=parent_container):
-        dpg.add_button(label="Process for Shaking Table", callback=svh.process_selected_trace, width=-1, height=30)
+        dpg.add_button(label="Process for Shaking Table", callback=sh.process_selected_trace, width=-1, height=30)
 
 def update_gui_callbacks():
     if app_state.viewer_data_dirty.is_set():
@@ -185,18 +185,16 @@ def create_gui():
             dpg.add_combo(["9600", "57600", "115200", "921600"], tag="baud_rate_combo", default_value="115200", width=100)
             dpg.add_button(label="Connect", tag="connect_button", callback=connect_callback, width=100)
             dpg.add_button(label="Disconnect", tag="disconnect_button", callback=disconnect_callback, width=100, show=False)
-            #dpg.add_button(label="home",tag="play_button")
             dpg.add_checkbox(label="ondas basicas", tag="checkbox_onda", callback=checkbox_callback)
         with dpg.tab_bar():
-            # --- VIEWER TAB (New) ---
             with dpg.tab(label="Seismic Trace Viewer"):
                 with dpg.group(tag="t1", show=True):
                     with dpg.group(horizontal=True):
                         with dpg.group(width=500):
                             dpg.add_text("Seismic Trace Selector")
                             dpg.add_button(label="Load Data from 'sismic_records'", 
-                                        callback=lambda: threading.Thread(target=svh.load_data_for_viewer_thread, daemon=True).start(), 
-                                        width=-1, height=40)
+                                callback=lambda: threading.Thread(target=sh.load_traces_from_folder_thread, daemon=True).start(), 
+                                width=-1, height=40)
                             dpg.add_separator()
                             with dpg.child_window(tag="viewer_file_tree", border=True):
                                 dpg.add_text("Click 'Load Data' to begin.")
@@ -212,28 +210,24 @@ def create_gui():
                             dpg.add_slider_int(label="Amplitude", tag="amplitude_slider", default_value=1600, min_value=100, max_value=10000)
                             dpg.add_slider_float(label="Frequency", tag="frequency_slider", default_value=0.5, min_value=0.1, max_value=5.0, format="%.2f Hz")
                             dpg.add_separator()
-                            
-                            dpg.add_separator()
                             with dpg.group(horizontal=True):
                                 dpg.add_button(label="Start Wave", tag="start_wave_button", callback=start_wave_callback, width=-1)
                                 dpg.add_button(label="Stop Wave", tag="stop_wave_button", callback=stop_wave_callback, width=-1)
                             dpg.add_separator()
                             dpg.add_text("Manual Control & Send Log")
-                            dpg.add_input_text(tag="command_input", hint="Command (e.g., m0)", on_enter=True, callback=send_manual_command_callback)
-                            dpg.add_button(label="Send Command", tag="send_command_button", callback=send_manual_command_callback, width=-1)
-                            with dpg.child_window(tag="console_send_container", height=-1, border=True):
-                                dpg.add_input_text(tag="console_send_output", multiline=True, readonly=True, width=-1, height=-1)
-                        #with dpg.group(width=-1):
-                            # with dpg.child_window(tag="console_recv_container", height=-1, border=True):
-                            #     dpg.add_input_text(tag="console_recv_output", multiline=True, readonly=True, width=-1, height=-1)
             with dpg.tab(label="manual"):
-                with dpg.group(width=-1):
-                    with dpg.child_window(tag="console_recv_container", height=-1, border=True):
-                        dpg.add_input_text(tag="console_recv_output", multiline=True, readonly=True, width=-1, height=-1)
+                with dpg.group(horizontal=True):
+                    with dpg.group(width=400):
+                        dpg.add_input_text(tag="command_input", hint="Command (e.g., m0)", on_enter=True, callback=send_manual_command_callback)
+                        dpg.add_button(label="Send Command", tag="send_command_button", callback=send_manual_command_callback)
+                        with dpg.child_window(tag="console_send_container", height=-1, border=True):
+                            dpg.add_input_text(tag="console_send_output", multiline=True, readonly=True, width=-1, height=-1)
+                    with dpg.child_window(tag="console_recv_container", height=-1,width=-1, border=True):
+                        dpg.add_input_text(tag="console_recv_output", multiline=True, readonly=True, height=-1)
             with dpg.tab(label="opciones"):
-                dpg.add_text("Motor Settings")
                 dpg.add_input_int(label="Speed (s)", tag="speed_input", default_value=50000)
                 dpg.add_input_int(label="Acceleration (a)", tag="accel_input", default_value=20000)
+                dpg.add_input_int(label="Commads per second", tag="commandsPerSecond_input", default_value=20000)
 
     with dpg.item_handler_registry(tag="window_resize_handler"):
         dpg.add_item_resize_handler(callback=update_plot_sizes)
@@ -242,8 +236,7 @@ def create_gui():
     dpg.set_primary_window("main_window", True)
     dpg.setup_dearpygui()
     update_ui_for_connection_state(False)
-    
-    
+
 def cleanup():
     disconnect_serial()
     app_state.app_running = False

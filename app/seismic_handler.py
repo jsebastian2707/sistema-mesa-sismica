@@ -18,7 +18,7 @@ def get_records_folder_path():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(script_dir, RECORDS_FOLDER_NAME)
 
-def load_data_for_viewer_thread():
+def load_traces_from_folder_thread():
     """Loads all seismic data from the records folder into the viewer's state variables."""
     print("Viewer: Starting data load...")
     folder_path = get_records_folder_path()
@@ -75,29 +75,38 @@ def process_selected_trace():
         return
 
     trace_info = app_state.viewer_all_traces[app_state.viewer_selected_trace_index]
-    original_trace = trace_info['obspy_trace'].copy()
-    print(f"Viewer: Processing {original_trace.id} for shaking table.")
+    trace_data = trace_info['obspy_trace'].copy()
+    print(f"Viewer: Processing {trace_data.id} for shaking table.")
 
     # Processing pipeline
-    original_trace.detrend('linear')
-    fmin, fmax = 0.1, 20  # Recommended bandpass filter frequencies
-    original_trace.filter('bandpass', freqmin=fmin, freqmax=fmax, corners=4, zerophase=True)
-    original_trace.differentiate()
-    print("Viewer: Detrend, filter, and differentiation complete.")
-
+    trace_data.detrend('linear')
+    fmin, fmax = 0.1, 20
+    trace_data.filter('bandpass', freqmin=fmin, freqmax=fmax, corners=4, zerophase=True)
+    trace_data.differentiate()
+    #print("Viewer: Detrend, filter, and differentiation complete.")
     # Visualization in a new window
-    accel_data, times = original_trace.data, original_trace.times()
-    
-    if dpg.does_item_exist("acceleration_window"):
-        dpg.delete_item("acceleration_window")
+    accel_data, times = trace_data.data, trace_data.times()
+    app_state.expected_wave_data = trace_data.tolist()
+    app_state.expected_wave_time = times.tolist()
+    print("Viewer: Acceleration data ready.")
+    # if dpg.does_item_exist("acceleration_window"):
+    #     dpg.delete_item("acceleration_window")
 
-    with dpg.window(label=f"Acceleration - {trace_info['id']}", width=800, height=500, tag="acceleration_window"):
-        dpg.add_text("Processed Acceleration Record", color=(100, 200, 255))
-        dpg.add_text(f"Filter: {fmin}-{fmax} Hz. Units: m/s^2")
-        dpg.add_separator()
-        with dpg.plot(label="Acceleration Plot", height=-1, width=-1):
-            dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="accel_x_axis")
-            with dpg.plot_axis(dpg.mvYAxis, label="Acceleration (m/s^2)", tag="accel_y_axis"):
-                dpg.add_line_series(times.tolist(), accel_data.tolist(), label="Acceleration")
-            dpg.fit_axis_data("accel_x_axis")
-            dpg.fit_axis_data("accel_y_axis")
+    # with dpg.window(label=f"Acceleration - {trace_info['id']}", width=800, height=500, tag="acceleration_window"):
+    #     dpg.add_text("Processed Acceleration Record", color=(100, 200, 255))
+    #     dpg.add_text(f"Filter: {fmin}-{fmax} Hz. Units: m/s^2")
+    #     dpg.add_separator()
+    #     with dpg.plot(label="Acceleration Plot", height=-1, width=-1):
+    #         dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="accel_x_axis")
+    #         with dpg.plot_axis(dpg.mvYAxis, label="Acceleration (m/s^2)", tag="accel_y_axis"):
+    #             dpg.add_line_series(times.tolist(), accel_data.tolist(), label="Acceleration")
+    #         dpg.fit_axis_data("accel_x_axis")
+    #         dpg.fit_axis_data("accel_y_axis")
+
+def trace_filters(trace): ###### trace filte example function
+    """Applies a series of filters to the trace and returns the processed trace."""
+    trace.detrend('linear')
+    fmin, fmax = 0.1, 20
+    trace.filter('bandpass', freqmin=fmin, freqmax=fmax, corners=4, zerophase=True)
+    trace.differentiate()
+    return trace
