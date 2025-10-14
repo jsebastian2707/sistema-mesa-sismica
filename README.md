@@ -161,33 +161,18 @@ graph LR
     UC5 -.->|require| UC1
     
 ```
-## 🗺️ Roadmap
 
-* Migración a **servomotor** + **PID avanzado** (o control en espacio de estados).
-* Mejoras de **filtrado** para reducir deriva post integración.
-* **Auto–calibración** de encoder / homing robusto.
-* Soporte para **múltiples ejes** y perfiles 6-DoF (futuro).
-* Exportación de **reportes** (PDF/CSV) con métricas de seguimiento.
+
+[## 🗺️ Roadmap * Migración a **servomotor** + **PID avanzado** (o control en espacio de estados). ]: # 
+[## * Mejoras de **filtrado** para reducir deriva post integración. ]: # 
+[## * **Auto–calibración** de encoder / homing robusto.]: # 
+[## * Soporte para **múltiples ejes** y perfiles 6-DoF (futuro).]: # 
+[## * Exportación de **reportes** (PDF/CSV) con métricas de seguimiento.]: # 
 
 [## 📚 Citar / Referencias]: # 
 
-Si usas este proyecto en tu trabajo académico, cita el repositorio y las fuentes de hardware/teoría (por ejemplo, textos de dinámica estructural y documentación de sensores/actuadores que utilices).
-
-## 🤝 Contribuciones
+[## 🤝 Contribuciones ]: # 
 
 ¡PRs bienvenidos! Abre un **issue** con: descripción, logs, versión de firmware/GUI, esquema de conexiones y archivos de prueba mínimos.
 
-## 📄 Licencia
-
-Indica aquí tu licencia (p. ej., MIT, Apache-2.0 o CC BY-NC-SA).
-`SPDX-License-Identifier: MIT`
-
-## 📨 Contacto
-
-* Autor/es: *[tu nombre y correo]*
-* Lab/Universidad: *[tu institución]*
-* Dudas técnicas: issues del repositorio
-
----
-
-> Sugerencia: añade a `docs/` un **esquemático** (PDF/PNG), una **foto del montaje** y un **GIF** corto de la mesa ejecutando un acelerograma para que tu README luzca aún mejor.
+ ![LICENSE](https://www.gnu.org/graphics/agplv3-88x31.png) 
