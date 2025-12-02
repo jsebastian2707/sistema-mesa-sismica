@@ -150,7 +150,7 @@ def update_gui_callbacks():
             if dpg.does_item_exist("console_send_container"): dpg.set_y_scroll("console_send_container", -1.0)
             app_state.log_dirty = False
 
-def update_plot_sizes():
+def update_plot_sizes():##the function that updates the plot sizes when the window is resized
     if dpg.does_item_exist("main_window"):
         window_width = dpg.get_item_width("main_window")
         window_height = dpg.get_item_height("main_window")

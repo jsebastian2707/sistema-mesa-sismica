@@ -3,20 +3,16 @@
 # This code operates on the shared app_state and does not create GUI elements directly,
 # with the exception of popup windows for plots.
 
-import dearpygui.dearpygui as dpg
 import numpy as np
 from obspy import read
 import os
-import threading
 
 import app_state
-
-RECORDS_FOLDER_NAME = "sismic_records"
 
 def get_records_folder_path():
     """Gets the absolute path to the sismic_records folder."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, RECORDS_FOLDER_NAME)
+    return os.path.join(script_dir, "sismic_records")
 
 def load_traces_from_folder_thread():
     """Loads all seismic data from the records folder into the viewer's state variables."""
@@ -89,19 +85,6 @@ def process_selected_trace():
     app_state.expected_wave_data = trace_data.tolist()
     app_state.expected_wave_time = times.tolist()
     print("Viewer: Acceleration data ready.")
-    # if dpg.does_item_exist("acceleration_window"):
-    #     dpg.delete_item("acceleration_window")
-
-    # with dpg.window(label=f"Acceleration - {trace_info['id']}", width=800, height=500, tag="acceleration_window"):
-    #     dpg.add_text("Processed Acceleration Record", color=(100, 200, 255))
-    #     dpg.add_text(f"Filter: {fmin}-{fmax} Hz. Units: m/s^2")
-    #     dpg.add_separator()
-    #     with dpg.plot(label="Acceleration Plot", height=-1, width=-1):
-    #         dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)", tag="accel_x_axis")
-    #         with dpg.plot_axis(dpg.mvYAxis, label="Acceleration (m/s^2)", tag="accel_y_axis"):
-    #             dpg.add_line_series(times.tolist(), accel_data.tolist(), label="Acceleration")
-    #         dpg.fit_axis_data("accel_x_axis")
-    #         dpg.fit_axis_data("accel_y_axis")
 
 def trace_filters(trace): ###### trace filte example function
     """Applies a series of filters to the trace and returns the processed trace."""

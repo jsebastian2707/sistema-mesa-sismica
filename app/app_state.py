@@ -1,8 +1,9 @@
 # app_state.py
-
+# se usa threading para el bloquear la escritura del panel donde se muestran los datos seriales
 import threading
 from collections import deque
 
+#ser es el objeto serial que dejamos aqui para llamarlo en varias partes del codigo 
 ser = None
 app_running = True
 data_lock = threading.Lock()
