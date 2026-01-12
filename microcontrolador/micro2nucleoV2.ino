@@ -45,7 +45,7 @@ void readEncoderTask(void *param) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(230400);
   Wire.begin();
   Wire.setClock(400000);
 
@@ -63,7 +63,7 @@ void setup() {
     stepper->setAcceleration(32000);
   } else {
     Serial.println("Stepper motor initialization failed!");
-    while (1);
+    while (1) delay(1000);
   }
   Serial.println("Sistema inicializado. Listo para recibir comandos.");
   Serial.println("Comandos: m<pos>, s<vel>, a<acel>, e<0/1>");
