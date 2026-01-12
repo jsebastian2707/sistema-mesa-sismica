@@ -5,8 +5,10 @@ import queue
 ##serial
 ser = None
 running: bool = True
+wave_running: bool = False
 viewer_all_traces: list = []
 cmd_queue = queue.Queue()
+wave_queue = queue.Queue()
 
 ##plots
 data_lock = threading.Lock()

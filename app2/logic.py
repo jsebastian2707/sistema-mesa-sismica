@@ -4,6 +4,15 @@ import state
 import time
 import math
 import queue
+import threading
+
+METER_X_REV = 0.008 #segun varilla roscada que usemos
+STEPS_X_REV = 3200 #segun el ajuste del controlador del motor   
+STEPS_PER_METER = STEPS_X_REV/METER_X_REV 
+
+sampling_rate = 20.0 
+
+
 def goHome():
     ##centrar la mesa hasta que la señal del enconder quede lo mas cerca cero
     print("xd")
@@ -86,8 +95,12 @@ def closeSerial():
 #                     time.sleep(0.5)
 #         else:
 #             time.sleep(0.5)
-
+"""lo unico que controla la frecuencia de este theread es el sleep a menos que 
+alguna parte del codigo sea bloqueante, cuando no hay una conexion serial activa
+solo corre a 10hz de resto corre a 1000hz"""
 def serial_controller_thread():
+    loop_count = 0
+    last_speed_check = time.time()
     while state.running:
         if state.ser and state.ser.is_open:
             try:
@@ -95,12 +108,9 @@ def serial_controller_thread():
                     cmd = state.cmd_queue.get_nowait()
                     #full_command = command + '\n'z
                     state.ser.write((cmd + '\n').encode("utf-8"))
-                    state.ser.flush()
-                    print("herereeee")
                     with state.data_lock:
                         state.log_send.append(f"[{time.strftime('%H:%M:%S')}] >> {cmd}")
                         state.log_dirty = True
-                    
                 except queue.Empty:
                     pass
                 if state.ser.in_waiting > 0:
@@ -125,7 +135,13 @@ def serial_controller_thread():
                         pass
             except (OSError, serial.SerialException):
                     print("Error: Port disconnected while writing.")
-                    break # Optional: Break loop or handle disconnection
-            time.sleep(0.001) 
+                    break
+            loop_count += 1
+            current_time = time.time()
+            if current_time - last_speed_check >= 1.0:
+                print(f"Thread Frequency: {loop_count} Hz")
+                loop_count = 0
+                last_speed_check = current_time
+            time.sleep(0.0005) 
         else:
             time.sleep(0.1)

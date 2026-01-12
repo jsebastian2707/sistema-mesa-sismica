@@ -56,7 +56,8 @@ def send_command_callback():
         if dpg.does_item_exist("command_input"):
             dpg.set_value("command_input", "")
 
-# def start_wave_callback():
+def start_wave_callback():
+    print("arranco la wave")
 #     if not state.wave_running:
 #         state.wave_running = True
 #         with state.data_lock:
@@ -68,7 +69,8 @@ def send_command_callback():
 #         if dpg.does_item_exist("start_wave_button"): dpg.disable_item("start_wave_button")
 #         if dpg.does_item_exist("stop_wave_button"): dpg.enable_item("stop_wave_button")
 
-# def stop_wave_callback():
+def stop_wave_callback():
+    print("se detuvo la wave")
 #     state.wave_running = False
 #     if dpg.does_item_exist("start_wave_button"): dpg.enable_item("start_wave_button")
 #     if dpg.does_item_exist("stop_wave_button"): dpg.disable_item("stop_wave_button")
@@ -169,6 +171,17 @@ def create_gui():
             dpg.add_button(label="Disconnect", tag="disconnect_button", callback=disconnect_callback, width=100, show=False)
             dpg.add_checkbox(label="ondas basicas", tag="checkbox_onda", callback=checkbox_callback)
         with dpg.group(horizontal=True):
+            with dpg.group(width=300):
+                dpg.add_text("Sine Wave Generator")
+                dpg.add_slider_int(label="Amplitude", tag="amplitude_slider", default_value=1600, min_value=100, max_value=10000)
+                dpg.add_slider_float(label="Frequency", tag="frequency_slider", default_value=0.5, min_value=0.1, max_value=5.0, format="%.2f Hz")
+                dpg.add_separator()
+                with dpg.group(horizontal=True):
+                    dpg.add_button(label="Start Wave", tag="start_wave_button", callback=start_wave_callback, width=-1)
+                    dpg.add_button(label="Stop Wave", tag="stop_wave_button", callback=stop_wave_callback, width=-1)
+                dpg.add_separator()
+                dpg.add_text("Manual Control & Send Log")
+        with dpg.group(horizontal=True):
             with dpg.group(width=400):
                 dpg.add_input_text(tag="command_input", hint="Command (e.g., m0)", on_enter=True, callback=send_command_callback)
                 dpg.add_button(label="Send Command", tag="send_command_button", callback=send_command_callback)
@@ -176,17 +189,7 @@ def create_gui():
                     dpg.add_input_text(tag="console_send_output", multiline=True, readonly=True, width=-1, height=-1)
             with dpg.child_window(tag="console_recv_container", height=-1,width=-1, border=True):
                 dpg.add_input_text(tag="console_recv_output", multiline=True, readonly=True, height=-1)
-        # with dpg.group(horizontal=True):
-        #     with dpg.group(width=300):
-        #         dpg.add_text("Sine Wave Generator")
-        #         dpg.add_slider_int(label="Amplitude", tag="amplitude_slider", default_value=1600, min_value=100, max_value=10000)
-        #         dpg.add_slider_float(label="Frequency", tag="frequency_slider", default_value=0.5, min_value=0.1, max_value=5.0, format="%.2f Hz")
-        #         dpg.add_separator()
-        #         with dpg.group(horizontal=True):
-        #             dpg.add_button(label="Start Wave", tag="start_wave_button", callback=start_wave_callback, width=-1)
-        #             dpg.add_button(label="Stop Wave", tag="stop_wave_button", callback=stop_wave_callback, width=-1)
-        #         dpg.add_separator()
-        #         dpg.add_text("Manual Control & Send Log")
+        # 
 #         with dpg.group(horizontal=True):
 #             with dpg.plot(label="monitor", tag="monitor"):
 #                 dpg.add_plot_legend()
@@ -236,12 +239,11 @@ def create_gui():
 
 # --- Your Main Function ---
 def main():
+    threading.Thread(target=serial_controller_thread, daemon=True).start()
     dpg.create_context()
     create_gui()       
     dpg.create_viewport(title='control mesa sismica', width=1200, height=700, x_pos=0, y_pos=0)
     dpg.setup_dearpygui()
-    threading.Thread(target=serial_controller_thread, daemon=True).start()
-
     dpg.show_viewport()
     while dpg.is_dearpygui_running():
         update_gui_callbacks()
