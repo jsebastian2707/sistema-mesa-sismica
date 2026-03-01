@@ -184,7 +184,7 @@ def create_gui():
             dpg.add_combo(items=[], tag="ports_combo", width=150)
             dpg.add_button(label="Refresh", callback=refresh_ports_callback)
             dpg.add_text("Baud Rate")
-            dpg.add_combo(["9600", "57600", "115200", "921600"], tag="baud_rate_combo", default_value="115200", width=100)
+            dpg.add_combo(["9600", "57600", "115200","230400","250000","921600"], tag="baud_rate_combo", default_value="115200", width=100)
             dpg.add_button(label="Connect", tag="connect_button", callback=connect_callback, width=100)
             dpg.add_button(label="Disconnect", tag="disconnect_button", callback=disconnect_callback, width=100, show=False)
             dpg.add_checkbox(label="ondas basicas", tag="checkbox_onda", callback=checkbox_callback)
