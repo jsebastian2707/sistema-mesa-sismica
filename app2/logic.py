@@ -1,121 +1,50 @@
+#types
+from typing import TypedDict
+from typing import Any
+from numpy.typing import NDArray
 import serial
 import serial.tools.list_ports
-import state
+from state import state
 import time
-import math
+#import math
 import queue
 import threading
 
-METER_X_REV = 0.008 #segun varilla roscada que usemos
-STEPS_X_REV = 3200 #segun el ajuste del controlador del motor   
-STEPS_PER_METER = STEPS_X_REV/METER_X_REV 
-
-sampling_rate = 20.0 
-
-
-def goHome():
-    ##centrar la mesa hasta que la señal del enconder quede lo mas cerca cero
-    print("xd")
-
-def runSismo():
-    ##only if the running flag is true works
-    print("xd")
-
-def wave_generator_thread():
-    """Background thread to generate a sine wave and send motor commands."""
-    start_time = time.time()
-    while state.running:
-        elapsed_time = time.time() - start_time
-        target_pos = state.amplitude * math.sin(2 * math.pi * state.frequency * elapsed_time)
-        state.cmd_queue.put(f"m{int(target_pos)}")
-        time.sleep(0.02)
+##for seismic procesor 
+from obspy import read, UTCDateTime # type: ignore
+from obspy.core import Trace  # type: ignore 
+import numpy as np
 
 def find_serial_ports():
     ports = serial.tools.list_ports.comports()
     return [port.device for port in ports] if ports else ["No Ports Found"]
 
-def connect_serial(port, baud):
-    if port == "No Ports Found":
-        print("No serial ports available.")
-    try:
-        state.ser = serial.Serial(port, int(baud), timeout=1, write_timeout=0.5)
-        with state.data_lock:
-            state.log_send.append(f"Conectado a {port} a {baud} baud.")
-            state.log_dirty = True
-    except serial.SerialException as e:
-        print("error"+e)
-        state.ser = None
+class SerialManager: 
+    """read and send estan dobles """
+    def __init__(self, port:str, baudrate: int):
+        try:
+            self.serial_port = serial.Serial(port, baudrate, timeout=1)
+            self.read_queue: queue.Queue[str]  = queue.Queue()
+            self.stop_event = threading.Event()
+            with state.data_lock:
+                state.log_send.append(f"Conectado a {port} a {baudrate} baud.")
+                state.log_dirty = True
+        except serial.SerialException as e:
+            print(f"error: {e}")
+            state.ser_manager = None
+        
+        # Iniciar el hilo de lectura
+        self.reader_thread = threading.Thread(target=self.read_thread, daemon=True)
+        self.reader_thread.start()
 
-def closeSerial():
-    if state.ser and state.ser.is_open:
-        state.ser.close()
-        state.ser = None
-
-
-# def send_command(command):
-#     """Sends a command to the serial port if it is connected."""
-#     if state.ser and state.ser.is_open:
-#         try:
-#             #full_command = command + '\n'
-#             state.ser.write(command.encode("utf-8"))
-#             state.ser.flush()
-#             with state.data_lock:
-#                 state.log_send.append(f"[{time.strftime('%H:%M:%S')}] >> {command}")
-#                 state.log_dirty = True
-#         except serial.SerialException as e:
-#             print("error " + e)
-#     else:   
-#         print("error ser is close")
-
-
-# def readSerialThread():
-#     """ lee la informacion del serial y la añade tanto a los logs 
-#     como a la data de los plots"""
-#     while state.running:
-#         if state.ser and state.ser.is_open:
-#             if state.ser.in_waiting > 0:
-#                 try:
-#                     line = state.ser.readline().decode("utf-8", errors='replace').strip()
-#                     if line:
-#                         with state.data_lock: ##aqui va el formato de los logs 
-#                             state.log_read.append(f"[{time.strftime('%H:%M:%S')}] << {line}")
-#                             state.log_dirty = True
-#                         try:
-#                             angle = float(line)
-#                             with state.data_lock:
-#                                 current_time = time.time() - state.start_time
-#                                 state.monitor_x.append(current_time)
-#                                 state.monitor_y.append(angle)
-#                                 if len(state.monitor_x) > state.max_points:
-#                                     state.monitor_x.pop(0)
-#                                     state.monitor_y.pop(0)
-#                         except ValueError:
-#                             pass
-#                 except (serial.SerialException, UnicodeDecodeError,):
-#                     time.sleep(0.5)
-#         else:
-#             time.sleep(0.5)
-"""lo unico que controla la frecuencia de este theread es el sleep a menos que 
-alguna parte del codigo sea bloqueante, cuando no hay una conexion serial activa
-solo corre a 10hz de resto corre a 1000hz"""
-def serial_controller_thread():
-    loop_count = 0
-    last_speed_check = time.time()
-    while state.running:
-        if state.ser and state.ser.is_open:
-            try:
-                try:
-                    cmd = state.cmd_queue.get_nowait()
-                    #full_command = command + '\n'z
-                    state.ser.write((cmd + '\n').encode("utf-8"))
-                    with state.data_lock:
-                        state.log_send.append(f"[{time.strftime('%H:%M:%S')}] >> {cmd}")
-                        state.log_dirty = True
-                except queue.Empty:
-                    pass
-                if state.ser.in_waiting > 0:
+    def read_thread(self):
+        """ lee la informacion del serial y la añade tanto a los logs 
+        como a la data de los plots"""
+        while state.running and not self.stop_event.is_set():
+            if self.serial_port and self.serial_port.is_open:
+                if self.serial_port.in_waiting > 0:
                     try:
-                        line = state.ser.readline().decode("utf-8", errors='replace').strip()
+                        line = self.serial_port.readline().decode("utf-8", errors='replace').strip()
                         if line:
                             with state.data_lock: ##aqui va el formato de los logs 
                                 state.log_read.append(f"[{time.strftime('%H:%M:%S')}] << {line}")
@@ -126,22 +55,191 @@ def serial_controller_thread():
                                     current_time = time.time() - state.start_time
                                     state.monitor_x.append(current_time)
                                     state.monitor_y.append(angle)
-                                    if len(state.monitor_x) > state.max_points:
-                                        state.monitor_x.pop(0)
-                                        state.monitor_y.pop(0)
                             except ValueError:
-                                pass
-                    except:
-                        pass
-            except (OSError, serial.SerialException):
-                    print("Error: Port disconnected while writing.")
-                    break
-            loop_count += 1
-            current_time = time.time()
-            if current_time - last_speed_check >= 1.0:
-                print(f"Thread Frequency: {loop_count} Hz")
-                loop_count = 0
-                last_speed_check = current_time
-            time.sleep(0.0005) 
+                                print(ValueError)
+                    except (serial.SerialException, UnicodeDecodeError,):
+                        time.sleep(0.5)
+            else:
+                time.sleep(0.5)
+
+    def send(self,command:str):
+        if self.serial_port and self.serial_port.is_open:
+            try:
+                self.serial_port.write(command.encode("utf-8"))
+                #self.serial_port.flush()
+                with state.data_lock:
+                    state.log_send.append(f"[{time.strftime('%H:%M:%S')}] >> {command}")
+                    state.log_dirty = True
+            except serial.SerialException as e:
+                print(f"error:{e}")
+        else:   
+            print("error ser is close")
+
+    def close(self):
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.close()
+            self.stop_event.set()
+            self.reader_thread.join()
+            state.ser_manager = None
+
+METER_X_REV = 0.008 #segun varilla roscada que usemos
+STEPS_X_REV = 3200 #segun el ajuste del controlador del motor 
+#import numpy as np  
+STEPS_PER_METER = STEPS_X_REV/METER_X_REV 
+
+sampling_rate = 20.0 
+
+class StatsType(TypedDict):
+    network: str
+    station: str
+    location: str
+    channel: str
+    npts: int
+    sampling_rate: float
+    starttime: UTCDateTime
+
+class SeismicProcessor:
+
+    ##tienen que generarse la lista de pasos con velocidades y tiempo, y ya despues de eso si se puede ejecutar el sismo
+
+    def goHome(self):
+        ##centrar la mesa hasta que la señal del enconder quede lo mas cerca cero
+        print("xd")
+
+
+    # def wave_generator_thread(self):
+    #     """Background thread to generate a sine wave and send motor commands."""
+    #     start_time = time.time()
+    #     while state.running:
+    #         elapsed_time = time.time() - start_time
+    #         target_pos = state.amplitude * math.sin(2 * math.pi * state.frequency * elapsed_time)
+    #         if state.ser_manager is not None:
+    #             state.ser_manager.send(f"m{int(target_pos)}")
+    #         time.sleep(0.02)
+    
+    # def generate_synthetic_trace(self):
+    #     duration = 5.0              # Seconds
+    #     frequency = 1.0             # Hz
+    #     amplitude = 0.005           # Meters (Reduced from 0.05 for safety on table testing, adjust as needed)
+        
+    #     # 2. Generate Synthetic Data (NumPy)
+    #     t = np.linspace(0, duration, int(sampling_rate * duration), endpoint=False)
+    #     synthetic_data : NDArray[np.float64]  = amplitude * np.sin(2 * np.pi * frequency * t)
+
+    #     stats: StatsType = {
+    #         'network': 'TEST',
+    #         'station': 'SYNTH', 
+    #         'location': '00',
+    #         'channel': 'HXZ',
+    #         'npts': len(synthetic_data),
+    #         'sampling_rate': sampling_rate,
+    #         'starttime': UTCDateTime() 
+    #     }
+    #     synth_trace: Any = Trace(data=synthetic_data, header=stats)
+    #     steps_array: NDArray[np.int_] = (cast(NDArray[np.float64], synth_trace.data) * STEPS_PER_METER).astype(int)
+        
+    #     # 5. Store in State for UI and Playback
+    #     with state.data_lock:
+    #         state.seismic_trace = tuple(steps_array.tolist())
+    #         #state.playback_index = 0
+            
+    #         # Update Validation Plot (Expected Data)
+    #         state.validation_x.clear()
+    #         state.validation_y.clear()
+    #         for i, step in enumerate(steps_array):
+    #             state.validation_x.append(t[i])
+    #             state.validation_y.append(step)
+                
+    #         state.log_send.append(f"Trace Generated: {len(steps_array)} points, Max Amp: {max(steps_array)} steps")
+    #         state.log_dirty = True
+
+    #     print("Trace ready in state.")
+    
+    def load_trace(self):
+        """
+        Called when the user selects an item in the Combo Box.
+        Decides whether to generate math or load a file.
+        """
+        if not state.is_file_selected_flag:
+            #self.generate_synthetic_trace()
+            duration = 5.0              # Seconds
+            frequency = 1.0             # Hz
+            amplitude = 0.005           # Meters (Reduced from 0.05 for safety on table testing, adjust as needed)
+            
+            # 2. Generate Synthetic Data (NumPy)
+            t = np.linspace(0, duration, int(sampling_rate * duration), endpoint=False)
+            synthetic_data : NDArray[np.float64]  = amplitude * np.sin(2 * np.pi * frequency * t)
+
+            stats: StatsType = {
+                'network': 'TEST',
+                'station': 'SYNTH', 
+                'location': '00',
+                'channel': 'HXZ',
+                'npts': len(synthetic_data),
+                'sampling_rate': sampling_rate,
+                'starttime': UTCDateTime() 
+            }
+            tr: Any = Trace(data=synthetic_data, header=stats)
         else:
-            time.sleep(0.1)
+            try:
+                st = read(state.file_path)
+                tr = st[0]
+            except Exception as e:
+                print(f"Error loading file: {e}")
+                return
+        tr.resample(sampling_rate)
+        steps_array = (tr.data * STEPS_PER_METER).astype(int)
+        #steps_array_relative = np.diff(steps_array, prepend=0)
+        # 4. Save to State
+        with state.data_lock:
+            state.seismic_trace = tuple(steps_array.tolist())
+            state.validation_x.clear()
+            state.validation_y.clear()
+            # Generate a simple time axis for the plot
+            t = np.linspace(0, float(tr.stats.npts / tr.stats.sampling_rate), tr.stats.npts)
+            for i, step in enumerate(steps_array):
+                if i < state.max_points:
+                    state.validation_x.append(t[i])
+                    state.validation_y.append(step)
+
+    def run_sismo_thread(self):
+        """
+        Sends the generated steps to the serial port at the correct sampling rate.
+        """
+        if not state.ser_manager:
+            print("Serial not connected")
+            return
+            
+        if not state.seismic_trace:
+            print("No trace loaded")
+            return
+
+        state.wave_running = True
+        period=1.0 / sampling_rate
+        start_time = time.time()
+        
+        # Go through the tuple of steps
+        for i, target_step in enumerate(state.seismic_trace):
+            if not state.wave_running:
+                break
+            
+            # Send command (assuming 'm' is absolute move)
+            cmd = f"m{target_step}" 
+            state.ser_manager.send(cmd)
+            #state.playback_index = i
+            
+            # Precise timing
+            elapsed = time.time() - start_time
+            expected_next_time = (i + 1) * period
+            sleep_time = expected_next_time - elapsed
+            
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+        
+        state.wave_running = False
+        print("Seismic Playback Finished.")
+        with state.data_lock:
+            state.log_send.append("Playback Finished.")
+            state.log_dirty = True
+
+processor = SeismicProcessor()

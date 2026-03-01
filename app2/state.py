@@ -1,29 +1,49 @@
 from collections import deque
 import threading
-import queue
+from typing import TYPE_CHECKING
 
-##serial
-ser = None
-running: bool = True
-wave_running: bool = False
-viewer_all_traces: list = []
-cmd_queue = queue.Queue()
-wave_queue = queue.Queue()
+if TYPE_CHECKING:
+    from logic import SerialManager 
 
-##plots
-data_lock = threading.Lock()
-max_points = 500
-monitor_x = deque(maxlen=500)
-monitor_y = deque(maxlen=500)
-validation_x = deque(maxlen=500)
-validation_y = deque(maxlen=500)
-start_time: float = 0    
 
-##logs
-log_dirty = False
-log_read = deque(maxlen=100)
-log_send = deque(maxlen=100)
 
-##custom wave 
-amplitude: int = 0
-frecuency: int = 0  
+class StateClass:
+    def __init__(self):
+        # Serial
+        self.ser_manager : SerialManager | None = None
+
+        ##flags  
+        self.running: bool = True ##son dos running por que puedes estar pausada la wave pero moviendose para el centro 
+        self.wave_running: bool= False
+
+        ##trace
+        self.is_file_selected_flag: bool =False
+        self.file_path:str= ""
+        self.seismic_trace: tuple[int, ...] = 0,  # The processed steps
+        #  self.playback_index: int = 0        # Where we are (0 to len-1)
+        
+        # Plots (Stateful data)
+        self.data_lock = threading.Lock()
+        self.max_points = 500
+        self.monitor_x: deque[float] = deque(maxlen=self.max_points)
+        self.monitor_y: deque[float] = deque(maxlen=self.max_points)
+        self.validation_x: deque[float] = deque(maxlen=self.max_points)
+        self.validation_y: deque[float] = deque(maxlen=self.max_points)
+        self.start_time: float = 0
+
+        # Logs
+        self.log_dirty:bool = False
+        self.log_read: deque[str]  = deque(maxlen=100)
+        self.log_send: deque[str]  = deque(maxlen=100)
+
+        # Custom Wave
+        self.amplitude = 0
+        self.frequency = 0
+
+    def reset_plots(self):
+        with self.data_lock:
+            self.monitor_x.clear()
+            self.monitor_y.clear()
+            self.start_time: float = 0
+
+state = StateClass()

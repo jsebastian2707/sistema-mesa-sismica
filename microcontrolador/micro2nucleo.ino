@@ -3,9 +3,9 @@
 #include <AS5600.h>
 #include <Wire.h>
 
-#define STEP_PIN 26
-#define DIR_PIN 27 
-#define ENABLE_PIN 14 
+#define STEP_PIN 32
+#define DIR_PIN 33 
+#define ENABLE_PIN 25 
 
 FastAccelStepperEngine engine;
 FastAccelStepper *stepper = nullptr;
@@ -42,7 +42,7 @@ void readEncoderTask(void *param) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(230400);
   Wire.begin();
   Wire.setClock(400000);
 
@@ -57,7 +57,7 @@ void setup() {
     stepper->setEnablePin(ENABLE_PIN);
     stepper->setAutoEnable(true); 
     stepper->setSpeedInHz(200000);
-    stepper->setAcceleration(32000);
+    stepper->setAcceleration(180000);
   } else {
     Serial.println("Stepper motor initialization failed!");
     while (1);
