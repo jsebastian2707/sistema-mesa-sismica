@@ -8,8 +8,10 @@ import numpy as np
 from obspy import read
 import os
 import threading
+import time
 
 import app_state
+from serial_handler import send_command
 
 RECORDS_FOLDER_NAME = "sismic_records"
 
@@ -28,8 +30,9 @@ def get_records_folder_path():
 def load_data_for_viewer_thread():
     """Loads all seismic data from the records folder into the viewer's state variables."""
     print("Viewer: Starting data load...")
+    _set_viewer_status("Loading seismic data...")
     folder_path = get_records_folder_path()
-    
+
     # Reset state
     app_state.viewer_seismic_files.clear()
     app_state.viewer_all_traces.clear()
@@ -39,6 +42,7 @@ def load_data_for_viewer_thread():
         files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.mseed', '.msd', '.miniseed'))]
         if not files:
             print("Viewer: No seismic files found.")
+            _set_viewer_status("No seismic files found in 'sismic_records'.")
             return
 
         for file_name in files:
@@ -70,10 +74,13 @@ def load_data_for_viewer_thread():
 
     except Exception as e:
         print(f"Viewer: General error loading data: {e}")
+        _set_viewer_status(f"Error loading data: {e}")
     finally:
         # Signal the GUI thread that it needs to redraw the file list
         app_state.viewer_data_dirty.set()
         print("Viewer: Data load finished.")
+        if app_state.viewer_all_traces:
+            _set_viewer_status("Data loaded. Select a trace to play.")
 
 def process_selected_trace():
     """Processes the currently selected trace to get acceleration and displays it."""

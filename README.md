@@ -1,12 +1,3 @@
-# 🌋 **Replica**
-## sistema de control para mesa sismica 
- ![LICENSE](https://www.gnu.org/graphics/agplv3-88x31.png)
- 
-software para el control de mesa sismica, que permite aprovechar la informacion publica que sobre los sismos
-
-Aquí tienes un **README.md** listo para tu repositorio. Puedes copiarlo tal cual y adaptarlo si cambias pines, nombres de carpetas o licencias. 
-
----
 
 # Mesa Sísmica de Bajo Costo con Control y GUI
 

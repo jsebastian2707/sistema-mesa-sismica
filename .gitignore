@@ -1,2 +1,25 @@
 __pycache__/
 **/__pycache__/
+
+# Entorno virtual
+venv/
+env/
+.venv/
+.env/
+
+# Archivos de Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

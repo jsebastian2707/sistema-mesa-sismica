@@ -125,6 +125,8 @@ def _update_viewer_detailed_plot():
         dpg.fit_axis_data(y_axis)
     with dpg.group(horizontal=True, parent=parent_container):
         dpg.add_button(label="Process for Shaking Table", callback=sh.process_selected_trace, width=-1, height=30)
+        dpg.add_button(label="▶ Play on Table", callback=lambda: sh.start_seismic_playback(amplitude=1600), width=-1, height=30)
+        dpg.add_button(label="⏹ Stop Playback", callback=sh.stop_seismic_playback, width=-1, height=30)
 
 def update_gui_callbacks():
     if app_state.viewer_data_dirty.is_set():
