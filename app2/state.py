@@ -37,6 +37,7 @@ class StateClass:
         self.log_send: deque[str]  = deque(maxlen=100)
 
         # Custom Wave
+        self.sampling_rate=20
         self.amplitude = 0
         self.frequency = 0
 

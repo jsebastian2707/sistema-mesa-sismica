@@ -1,6 +1,5 @@
 #types
-from typing import TypedDict
-from typing import Any
+from typing import TypedDict,NotRequired,Any
 from numpy.typing import NDArray
 import serial
 import serial.tools.list_ports
@@ -52,8 +51,7 @@ class SerialManager:
                             try:
                                 angle = float(line)
                                 with state.data_lock:
-                                    current_time = time.time() - state.start_time
-                                    state.monitor_x.append(current_time)
+                                    state.monitor_x.append(time.time() - state.start_time)##current time
                                     state.monitor_y.append(angle)
                             except ValueError:
                                 print(ValueError)
@@ -65,8 +63,10 @@ class SerialManager:
     def send(self,command:str):
         if self.serial_port and self.serial_port.is_open:
             try:
-                self.serial_port.write(command.encode("utf-8"))
+                self.serial_port.write((command+"\n").encode("utf-8"))
                 #self.serial_port.flush()
+                """bloqueante hasta que el buffer de salida se desocupe, cuando la velocidad 
+                de trasmision es suficiente no representa ningun cambio """
                 with state.data_lock:
                     state.log_send.append(f"[{time.strftime('%H:%M:%S')}] >> {command}")
                     state.log_dirty = True
@@ -77,21 +77,19 @@ class SerialManager:
 
     def close(self):
         if self.serial_port and self.serial_port.is_open:
-            self.serial_port.close()
             self.stop_event.set()
-            self.reader_thread.join()
+            if self.reader_thread.is_alive():
+                self.reader_thread.join()   
+            self.serial_port.close()
             state.ser_manager = None
 
 METER_X_REV = 0.008 #segun varilla roscada que usemos
 STEPS_X_REV = 3200 #segun el ajuste del controlador del motor 
-#import numpy as np  
 STEPS_PER_METER = STEPS_X_REV/METER_X_REV 
 
-sampling_rate = 20.0 
-
 class StatsType(TypedDict):
-    network: str
-    station: str
+    network: NotRequired[str]
+    station: NotRequired[str]
     location: str
     channel: str
     npts: int
@@ -167,7 +165,7 @@ class SeismicProcessor:
             amplitude = 0.005           # Meters (Reduced from 0.05 for safety on table testing, adjust as needed)
             
             # 2. Generate Synthetic Data (NumPy)
-            t = np.linspace(0, duration, int(sampling_rate * duration), endpoint=False)
+            t = np.linspace(0, duration, int(state.sampling_rate * duration), endpoint=False)
             synthetic_data : NDArray[np.float64]  = amplitude * np.sin(2 * np.pi * frequency * t)
 
             stats: StatsType = {
@@ -176,7 +174,7 @@ class SeismicProcessor:
                 'location': '00',
                 'channel': 'HXZ',
                 'npts': len(synthetic_data),
-                'sampling_rate': sampling_rate,
+                'sampling_rate': state.sampling_rate,
                 'starttime': UTCDateTime() 
             }
             tr: Any = Trace(data=synthetic_data, header=stats)
@@ -187,8 +185,9 @@ class SeismicProcessor:
             except Exception as e:
                 print(f"Error loading file: {e}")
                 return
-        tr.resample(sampling_rate)
-        steps_array = (tr.data * STEPS_PER_METER).astype(int)
+        tr.resample(state.sampling_rate)
+        #tr.plot() ##solo para pruebas, tiene conflictos con dpg 
+        steps_array = (tr.data).astype(int)###corregir la relacion de movimiento
         #steps_array_relative = np.diff(steps_array, prepend=0)
         # 4. Save to State
         with state.data_lock:
@@ -198,9 +197,8 @@ class SeismicProcessor:
             # Generate a simple time axis for the plot
             t = np.linspace(0, float(tr.stats.npts / tr.stats.sampling_rate), tr.stats.npts)
             for i, step in enumerate(steps_array):
-                if i < state.max_points:
-                    state.validation_x.append(t[i])
-                    state.validation_y.append(step)
+                state.validation_x.append(t[i])
+                state.validation_y.append(step)
 
     def run_sismo_thread(self):
         """
@@ -215,7 +213,7 @@ class SeismicProcessor:
             return
 
         state.wave_running = True
-        period=1.0 / sampling_rate
+        period=1.0 / state.sampling_rate 
         start_time = time.time()
         
         # Go through the tuple of steps

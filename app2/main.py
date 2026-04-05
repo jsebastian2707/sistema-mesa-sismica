@@ -215,7 +215,7 @@ def create_gui():
             dpg.add_text("no file selected",tag="file_text")
             dpg.add_button(label="Directory Selector", callback=lambda: dpg.configure_item("file_dialog_id",show=not dpg.is_item_shown("file_dialog_id")))
             with dpg.file_dialog(directory_selector=False, show=False, callback=file_callback, tag="file_dialog_id", width=700 ,height=400):
-                dpg.add_file_extension(".miniseed")
+                dpg.add_file_extension("{.miniseed,.ascii}",custom_text="sismos")
                 dpg.add_file_extension("", color=(150, 255, 150, 255))
         with dpg.group(horizontal=True):
             dpg.add_button(label="play", tag="start_wave_button", callback=start_wave_callback, width=100)
