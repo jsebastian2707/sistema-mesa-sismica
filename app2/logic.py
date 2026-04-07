@@ -51,8 +51,11 @@ class SerialManager:
                             try:
                                 angle = float(line)
                                 with state.data_lock:
-                                    state.monitor_x.append(time.time() - state.start_time)##current time
+                                    state.monitor_x.append(time.time() - 10)##current time
                                     state.monitor_y.append(angle)
+                                if(state.wave_running):
+                                    state.validation_x2.append(time.time() - state.start_time)##current time
+                                    state.validation_y2.append(angle*8)
                             except ValueError:
                                 print(ValueError)
                     except (serial.SerialException, UnicodeDecodeError,):
@@ -65,6 +68,7 @@ class SerialManager:
             try:
                 self.serial_port.write((command+"\n").encode("utf-8"))
                 #self.serial_port.flush()
+                print(self.serial_port.out_waiting)
                 """bloqueante hasta que el buffer de salida se desocupe, cuando la velocidad 
                 de trasmision es suficiente no representa ningun cambio """
                 with state.data_lock:
@@ -78,8 +82,7 @@ class SerialManager:
     def close(self):
         if self.serial_port and self.serial_port.is_open:
             self.stop_event.set()
-            if self.reader_thread.is_alive():
-                self.reader_thread.join()   
+            self.reader_thread.join()
             self.serial_port.close()
             state.ser_manager = None
 
@@ -100,77 +103,45 @@ class SeismicProcessor:
 
     ##tienen que generarse la lista de pasos con velocidades y tiempo, y ya despues de eso si se puede ejecutar el sismo
 
-    def goHome(self):
-        ##centrar la mesa hasta que la señal del enconder quede lo mas cerca cero
-        print("xd")
-
-
-    # def wave_generator_thread(self):
-    #     """Background thread to generate a sine wave and send motor commands."""
-    #     start_time = time.time()
-    #     while state.running:
-    #         elapsed_time = time.time() - start_time
-    #         target_pos = state.amplitude * math.sin(2 * math.pi * state.frequency * elapsed_time)
-    #         if state.ser_manager is not None:
-    #             state.ser_manager.send(f"m{int(target_pos)}")
-    #         time.sleep(0.02)
-    
-    # def generate_synthetic_trace(self):
-    #     duration = 5.0              # Seconds
-    #     frequency = 1.0             # Hz
-    #     amplitude = 0.005           # Meters (Reduced from 0.05 for safety on table testing, adjust as needed)
+    def go_home_thread(self):
+        if not state.ser_manager:
+            print("Serial no conectado")
+            return
         
-    #     # 2. Generate Synthetic Data (NumPy)
-    #     t = np.linspace(0, duration, int(sampling_rate * duration), endpoint=False)
-    #     synthetic_data : NDArray[np.float64]  = amplitude * np.sin(2 * np.pi * frequency * t)
-
-    #     stats: StatsType = {
-    #         'network': 'TEST',
-    #         'station': 'SYNTH', 
-    #         'location': '00',
-    #         'channel': 'HXZ',
-    #         'npts': len(synthetic_data),
-    #         'sampling_rate': sampling_rate,
-    #         'starttime': UTCDateTime() 
-    #     }
-    #     synth_trace: Any = Trace(data=synthetic_data, header=stats)
-    #     steps_array: NDArray[np.int_] = (cast(NDArray[np.float64], synth_trace.data) * STEPS_PER_METER).astype(int)
-        
-    #     # 5. Store in State for UI and Playback
-    #     with state.data_lock:
-    #         state.seismic_trace = tuple(steps_array.tolist())
-    #         #state.playback_index = 0
+        precision_threshold = 5 
+        pos= 0
+        while state.running:
+            with state.data_lock:
+                # Obtenemos la última posición conocida del encoder
+                if not state.monitor_y:
+                    current_pos = 0
+                else:
+                    current_pos = state.monitor_y[-1] # Último valor del deque
             
-    #         # Update Validation Plot (Expected Data)
-    #         state.validation_x.clear()
-    #         state.validation_y.clear()
-    #         for i, step in enumerate(steps_array):
-    #             state.validation_x.append(t[i])
-    #             state.validation_y.append(step)
-                
-    #         state.log_send.append(f"Trace Generated: {len(steps_array)} points, Max Amp: {max(steps_array)} steps")
-    #         state.log_dirty = True
+            # Calculamos el error (cuánto nos falta para llegar a 0)
+            error = 0 - current_pos
+            if abs(error) <= precision_threshold:
+                break
+            correction = int(error *8* 0.8) # Ganancia de 0.8 para no pasarse (overshoot)
+            if abs(correction) > 10000:
+                correction = 10000 if correction > 0 else -10000
+            pos += correction
+            state.ser_manager.send(f"m{pos}")
+            time.sleep(0.5)
 
-    #     print("Trace ready in state.")
+        # Al finalizar el bucle (llegamos al centro), mandamos el comando 'z'
+        state.ser_manager.send("z")
     
     def load_trace(self):
-        """
-        Called when the user selects an item in the Combo Box.
-        Decides whether to generate math or load a file.
-        """
         if not state.is_file_selected_flag:
-            #self.generate_synthetic_trace()
             duration = 5.0              # Seconds
             frequency = 1.0             # Hz
-            amplitude = 0.005           # Meters (Reduced from 0.05 for safety on table testing, adjust as needed)
+            amplitude = 1600           # steps
             
-            # 2. Generate Synthetic Data (NumPy)
             t = np.linspace(0, duration, int(state.sampling_rate * duration), endpoint=False)
             synthetic_data : NDArray[np.float64]  = amplitude * np.sin(2 * np.pi * frequency * t)
 
             stats: StatsType = {
-                'network': 'TEST',
-                'station': 'SYNTH', 
                 'location': '00',
                 'channel': 'HXZ',
                 'npts': len(synthetic_data),
@@ -187,14 +158,12 @@ class SeismicProcessor:
                 return
         tr.resample(state.sampling_rate)
         #tr.plot() ##solo para pruebas, tiene conflictos con dpg 
-        steps_array = (tr.data).astype(int)###corregir la relacion de movimiento
+        steps_array = (tr.data).astype(int)
         #steps_array_relative = np.diff(steps_array, prepend=0)
-        # 4. Save to State
         with state.data_lock:
             state.seismic_trace = tuple(steps_array.tolist())
             state.validation_x.clear()
             state.validation_y.clear()
-            # Generate a simple time axis for the plot
             t = np.linspace(0, float(tr.stats.npts / tr.stats.sampling_rate), tr.stats.npts)
             for i, step in enumerate(steps_array):
                 state.validation_x.append(t[i])
@@ -211,31 +180,19 @@ class SeismicProcessor:
         if not state.seismic_trace:
             print("No trace loaded")
             return
-
+        state.start_time = time.time()
         state.wave_running = True
-        period=1.0 / state.sampling_rate 
-        start_time = time.time()
-        
-        # Go through the tuple of steps
+        period=1.0 / state.sampling_rate
         for i, target_step in enumerate(state.seismic_trace):
             if not state.wave_running:
                 break
-            
-            # Send command (assuming 'm' is absolute move)
-            cmd = f"m{target_step}" 
-            state.ser_manager.send(cmd)
-            #state.playback_index = i
-            
-            # Precise timing
-            elapsed = time.time() - start_time
-            expected_next_time = (i + 1) * period
-            sleep_time = expected_next_time - elapsed
-            
+            # Send command (assuming 'm' is absolute move) si el movimiento es relativo usar diff  
+            state.ser_manager.send(f"m{target_step}" )
+            #state.playback_index = i #si se desea pausar y despuasar la reproduccion del sismo, se debe guardar este index
+            sleep_time =  ((i + 1) * period )- (time.time() - state.start_time) ##expected nextime * elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
-        
         state.wave_running = False
-        print("Seismic Playback Finished.")
         with state.data_lock:
             state.log_send.append("Playback Finished.")
             state.log_dirty = True

@@ -42,7 +42,7 @@ void readEncoderTask(void *param) {
 }
 
 void setup() {
-  Serial.begin(230400);
+  Serial.begin(250000);
   Wire.begin();
   Wire.setClock(400000);
 
@@ -93,6 +93,9 @@ void loop() {
       stepper->setSpeedInHz(data);
     } else if (command.startsWith("a")) {
       stepper->setAcceleration(data);
-    } 
+    } else if (command.startsWith("z")) {
+      stepper->setCurrentPosition(0);
+      //position_counts = 0;
+    }
   }
 }

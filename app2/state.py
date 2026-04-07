@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from logic import SerialManager 
 
-
-
 class StateClass:
     def __init__(self):
         # Serial
@@ -27,14 +25,16 @@ class StateClass:
         self.max_points = 500
         self.monitor_x: deque[float] = deque(maxlen=self.max_points)
         self.monitor_y: deque[float] = deque(maxlen=self.max_points)
-        self.validation_x: deque[float] = deque(maxlen=self.max_points)
-        self.validation_y: deque[float] = deque(maxlen=self.max_points)
+        self.validation_x: deque[float] = deque()
+        self.validation_y: deque[float] = deque()
+        self.validation_x2: deque[float] = deque()
+        self.validation_y2: deque[float] = deque()
         self.start_time: float = 0
 
         # Logs
         self.log_dirty:bool = False
-        self.log_read: deque[str]  = deque(maxlen=100)
-        self.log_send: deque[str]  = deque(maxlen=100)
+        self.log_read: deque[str]  = deque(maxlen=200)
+        self.log_send: deque[str]  = deque(maxlen=200)
 
         # Custom Wave
         self.sampling_rate=20

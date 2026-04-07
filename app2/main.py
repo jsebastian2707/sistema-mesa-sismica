@@ -125,7 +125,7 @@ def send_command_callback():
             dpg.set_value("command_input", "")
 
 def start_wave_callback():
-    print("arranco la wave, o se detuvo dependiendo del estado ")
+    #print("arranco la wave, o se detuvo dependiendo del estado ")
     if state.ser_manager:
         if not state.wave_running:
             if dpg.does_item_exist("start_wave_button"):
@@ -135,7 +135,6 @@ def start_wave_callback():
             state.wave_running = False
             if dpg.does_item_exist("start_wave_button"): 
                 dpg.configure_item("start_wave_button", label="Play")
-            print("deberia detenerla")
     else:
         print("no conectado")
     # Lógica para detener
@@ -144,6 +143,13 @@ def start_wave_callback():
     #     state.plot_start_time = time.time()
     # if dpg.does_item_exist("speed_input"): send_command(f"s{dpg.get_value('speed_input')}")
     # if dpg.does_item_exist("accel_input"): send_command(f"a{dpg.get_value('accel_input')}")
+
+def home_callback():
+    if state.ser_manager:
+        if not state.wave_running:
+            threading.Thread(target=processor.go_home_thread, daemon=True).start()
+    else:
+        print("no conectado")
 
 def file_callback(sender:Any, app_data:Any):
     if 'file_path_name' in app_data:
@@ -167,7 +173,10 @@ def update_gui_callbacks():
             dpg.set_value("series_real_comp", [list(state.monitor_x), list(state.monitor_y)])
             dpg.fit_axis_data("x_axis_comp")
             dpg.fit_axis_data("y_axis_comp")
-
+        if len(state.validation_x2) > 0 and dpg.does_item_exist("series_expected_comp2"):
+            dpg.set_value("series_real_comp2", [list(state.validation_x2), list(state.validation_y2)])
+            dpg.fit_axis_data("x_axis_comp")
+            dpg.fit_axis_data("y_axis_comp")
         # Actualizar gráfica Validación (Esperada vs Real)
         # if len(state.validation_x) > 0 and dpg.does_item_exist("series_expected_comp2"):
         #     dpg.set_value("series_expected_comp2", [list(state.validation_x), list(state.validation_y)])
@@ -221,6 +230,7 @@ def create_gui():
             dpg.add_button(label="play", tag="start_wave_button", callback=start_wave_callback, width=100)
             dpg.add_slider_int(label="Amplitude", tag="amplitude_slider", default_value=1600, min_value=100, max_value=10000,width=200)
             dpg.add_slider_float(label="Frequency", tag="frequency_slider", default_value=0.5, min_value=0.1, max_value=5.0, format="%.2f Hz", width=200) 
+            dpg.add_button(label="home", tag="home_button", callback=home_callback, width=100)
         # with dpg.group(horizontal=True):
         #     dpg.add_input_int(label="Speed (s)", tag="speed_input", default_value=50000)
         #     dpg.add_input_int(label="Acceleration (a)", tag="accel_input", default_value=20000)
