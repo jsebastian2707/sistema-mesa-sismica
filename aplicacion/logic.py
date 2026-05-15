@@ -52,10 +52,10 @@ class SerialManager:
                                 angle = float(line)
                                 with state.data_lock:
                                     state.monitor_x.append(time.time() - 10)##current time
-                                    state.monitor_y.append(angle)
+                                    state.monitor_y.append(angle*-1)
                                 if(state.wave_running):
                                     state.validation_x2.append(time.time() - state.start_time)##current time
-                                    state.validation_y2.append(angle*8)
+                                    state.validation_y2.append(angle*8*-1)
                             except ValueError:
                                 print(ValueError)
                     except (serial.SerialException, UnicodeDecodeError,):
