@@ -39,68 +39,78 @@ graph TD
 ## 🧱 Diagrama de Clases 
 ```mermaid
 classDiagram
-    class app_state {
-        <<module>>
-        +data_lock threading.Lock
-        +list x_data
-        +list y_data
-        +list expected_wave_data
-        +list log_recv
-        +list log_sent
-        +bool log_dirty
+
+    %% STATE MANAGEMENT
+    class StateClass {
+        <<singleton>>
+        +SerialManager ser_manager
+        +bool running
         +bool wave_running
-        +bool app_running
-        +float plot_start_time
+        +bool is_file_selected_flag
+        +str file_path
+        +tuple[int] seismic_trace
+        +threading.Lock data_lock
         +int max_points
-        +dict viewer_seismic_files
-        +list viewer_all_traces
-        +int viewer_selected_trace_index
-        +threading.Event viewer_data_dirty
+        +deque~float~ monitor_x
+        +deque~float~ monitor_y
+        +deque~float~ validation_x
+        +deque~float~ validation_y
+        +deque~float~ validation_x2
+        +deque~float~ validation_y2
+        +float start_time
+        +bool log_dirty
+        +deque~str~ log_read
+        +deque~str~ log_send
+        +float sampling_rate
+        +float amplitude
+        +float frequency
+        +reset_plots()
     }
 
-    class main {
+    %% HARDWARE COMMS
+    class SerialManager {
+        +serial.Serial serial_port
+        +queue.Queue~str~ read_queue
+        +threading.Event stop_event
+        +threading.Thread reader_thread
+        +__init__(port: str, baudrate: int)
+        +read_thread()
+        +send(command: str)
+        +close()
+    }
+
+    %% DATA PROCESSING
+    class SeismicProcessor {
+        +go_home_thread()
+        +load_trace()
+        +run_sismo_thread()
+    }
+
+    %% MAIN GUI MODULE
+    class main_gui {
         <<module>>
-        +create_gui()
+        +update_ui_for_connection_state()
+        +connect_callback()
+        +disconnect_callback()
+        +refresh_ports_callback()
+        +send_command_callback()
+        +start_wave_callback()
+        +home_callback()
+        +file_callback(sender, app_data)
         +update_gui_callbacks()
-        +cleanup()
+        +update_plot_sizes()
+        +create_gui()
         +main()
-        -update_ui_for_connection_state(bool)
-        -checkbox_callback()
-        -connect_callback()
-        -disconnect_callback()
-        -refresh_ports_callback()
-        -send_manual_command_callback()
-        -start_wave_callback()
-        -stop_wave_callback()
-        -_viewer_on_trace_select()
-        -_update_viewer_file_tree()
-        -_update_viewer_detailed_plot()
     }
 
-    class serial_handler {
-        <<module>>
-        +find_serial_ports() list
-        +connect_serial(port, baud) tuple
-        +disconnect_serial()
-        +send_command(command)
-        +read_serial_thread()
-        +wave_generator_thread()
-    }
+    %% RELACIONES
+    main_gui --> StateClass : reads / mutates
+    main_gui --> SerialManager : instantiates / calls
+    main_gui --> SeismicProcessor : starts threads
 
-    class seismic_handler {
-        <<module>>
-        +RECORDS_FOLDER_NAME str
-        +get_records_folder_path() str
-        +load_data_for_viewer_thread()
-        +process_selected_trace()
-    }
-    
-    main ..> app_state : reads/writes
-    main ..> serial_handler : calls
-    main ..> seismic_handler : calls
-
-    serial_handler ..> app_state : reads/writes
-    seismic_handler ..> app_state : reads/writes
+    StateClass o-- SerialManager : holds instance
+    SeismicProcessor --> StateClass : updates traces & sends commands
+    SerialManager --> StateClass : updates logs & plot data
 ```
 ## 🧱 Diagrama de casos de uso 
 ```mermaid
